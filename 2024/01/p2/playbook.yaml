@@ -1,0 +1,31 @@
+- name: Day 01
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    content: "{{ lookup('file', 'data/test1.txt') }}"
+    ret: "0"
+  tasks:
+    - name: Split test file
+      ansible.builtin.set_fact:
+        split_content: "{{ content.split('\n') | map('split', ' ')}}"
+        arr0: []
+        arr1: []
+    - name: Generate arrays
+      ansible.builtin.set_fact:
+        arr0: "{{ arr0 + [item[0]] }}"
+        arr1: "{{ arr1 + [item[-1]] }}"
+      loop: "{{ split_content }}"
+    - name: Sort arrays
+      ansible.builtin.set_fact:
+        arr0: "{{ arr0 | sort }}"
+        arr1: "{{ arr1 | sort }}"
+    - name: Sum differences
+      ansible.builtin.set_fact:
+        ret: "{{ (ret | int) + (((arr0[idx] | int) - (arr1[idx] | int)) | abs) }}"
+      loop: "{{ arr0 }}"
+      loop_control:
+        index_var: idx
+    - name: Puzzle output
+      ansible.builtin.debug:
+        var: ret
