@@ -3,8 +3,18 @@
   connection: local
   gather_facts: false
   vars:
-    content: "{{ lookup('file', 'data/test1.txt') }}"
-    ret: "0"
+    content: "{{ lookup('file', 'data/test1.in') }}"
+    ret: 0
+    idxl: 0
+    idxr: 0
+    left: 0
+    right: 0
+    temp_count: 0
+    buffer: 0
+    equals: false
+    less: false
+    greater: false
+    prev: 0
   tasks:
     - name: Split test file
       ansible.builtin.set_fact:
@@ -20,12 +30,38 @@
       ansible.builtin.set_fact:
         arr0: "{{ arr0 | sort }}"
         arr1: "{{ arr1 | sort }}"
-    - name: Sum differences
+    - name: Loop through arrays
       ansible.builtin.set_fact:
-        ret: "{{ (ret | int) + (((arr0[idx] | int) - (arr1[idx] | int)) | abs) }}"
-      loop: "{{ arr0 }}"
-      loop_control:
-        index_var: idx
+        l: "{{ left }}"
+        li: "{{ idxl }}"
+        r: "{{ right }}"
+        ri: "{{ idxr }}"
+        p: "{{ arr0[prev | int] }}"
+        buffer: |
+          {{ (1 if equals and arr0[prev | int] != arr0[idxl | int] else (
+            (buffer | int) + 1 if equals else ((buffer | int) if arr0[prev | int] == arr0[idxl | int] else 0))) }}
+        ret: |
+          {{ (ret | int) + (
+            ((arr0[(idxl | int)] | int) * (buffer | int)) if not equals else 0)
+          }}
+        prev: "{{ idxl }}"
+        idxl: "{{ ((idxl | int) + 1) if less else idxl }}"
+        idxr: "{{ ((idxr | int) + 1) if (equals or greater) else idxr }}"
+      vars:
+        left: "{{ arr0[idxl | int] }}"
+        right: "{{ arr1[idxr | int] }}"
+        # l == r
+        equals: "{{ (arr0[idxl | int] == arr1[idxr | int]) }}"
+        # l < r
+        less: "{{ (arr0[idxl | int] < arr1[idxr | int]) }}"
+        # l > r
+        greater: "{{ (arr0[idxl | int] > arr1[idxr | int]) }}"
+      loop: "{{ query('sequence', 'start=1 end='+( (arr0 | length) + (arr1 | length) )|string) }}"
+      when: (idxl | int) < (arr0 | length) and (idxr | int) < (arr1 | length)
+      # register: loop_result
+    # - name: Debug output
+    #   ansible.builtin.debug:
+    #     var: loop_result
     - name: Puzzle output
       ansible.builtin.debug:
-        var: ret
+        msg: "{{ idxl }} {{ idxr }} {{ ret | int }}"

@@ -3,7 +3,7 @@
   connection: local
   gather_facts: false
   vars:
-    content: "{{ lookup('file', 'data/test1.txt') }}"
+    content: "{{ lookup('file', 'data/test1.in') }}"
     ret: "0"
   tasks:
     - name: Split test file

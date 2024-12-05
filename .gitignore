@@ -1,0 +1,2 @@
+# Exclude test data files, which use .in extension.
+*.in
