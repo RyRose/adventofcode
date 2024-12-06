@@ -1,0 +1,28 @@
+- name: Day 01
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    content: "{{ lookup('file', 'data/test1.in') }}"
+    split_content: "{{ content.split('\n') | map('split', ' ')}}"
+    arr0: []
+    arr1: []
+    counts: {}
+    ret: 0
+  tasks:
+    - name: Generate arrays
+      ansible.builtin.set_fact:
+        arr0: "{{ arr0 + [item[0]] }}"
+        arr1: "{{ arr1 + [item[-1]] }}"
+      loop: "{{ split_content }}"
+    - name: Generate mapping from value to count for arr1
+      ansible.builtin.set_fact:
+        counts: "{{ counts | combine({item: counts.get(item, 0) + 1}) }}"
+      loop: "{{ arr1 }}"
+    - name: Accumulate similarity scores.
+      ansible.builtin.set_fact:
+        ret: "{{ (ret | int) + counts.get(item, 0) * (item | int) }}"
+      loop: "{{ arr0 }}"
+    - name: Puzzle output
+      ansible.builtin.debug:
+        msg: "{{ ret | int }}"
