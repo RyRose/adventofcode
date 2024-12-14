@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn determine_first_large_enough_empty_region(arr: []isize, size: usize) ?[]isize {
+fn determine_first_large_enough_empty_region(arr: []isize, size: usize) ?[]isize {
     var len: usize = 0;
     for (arr, 0..) |val, i| {
         if (val == -1) {
@@ -15,10 +15,30 @@ pub fn determine_first_large_enough_empty_region(arr: []isize, size: usize) ?[]i
     return null;
 }
 
-pub fn memset(arr: []isize, val: isize) void {
-    for (arr) |*ptr| {
-        ptr.* = val;
+const Block = struct {
+    value: i64,
+    len: usize,
+};
+
+fn determine_first_empty(blocks: []Block, len: usize) ?usize {
+    for (blocks, 0..) |block, i| {
+        if (block.value != -1) {
+            continue;
+        }
+        if (block.len >= len) {
+            return i;
+        }
     }
+    return null;
+}
+
+fn insert(blocks: *std.ArrayList(Block), from: usize, to: usize) !void {
+    const block = blocks.items[from];
+    blocks.items[from].value = -1;
+    try blocks.insert(to, block);
+    try std.testing.expect(blocks.items[to + 1].len >= block.len);
+    try std.testing.expect(blocks.items[to + 1].value == -1);
+    blocks.items[to + 1].len -= block.len;
 }
 
 pub fn main() !void {
@@ -28,7 +48,7 @@ pub fn main() !void {
     const content = try std.fs.cwd().readFileAlloc(allocator, "./data/test1.in", 1_000_000);
     defer allocator.free(content);
 
-    var blocks = std.ArrayList(i64).init(allocator);
+    var blocks = std.ArrayList(Block).init(allocator);
     defer blocks.deinit();
 
     for (content, 0..) |char, i| {
@@ -37,46 +57,39 @@ pub fn main() !void {
         }
         const val = char - '0';
         if (i % 2 == 1) {
-            for (0..val) |_| {
-                try blocks.append(-1);
-            }
+            try blocks.append(Block{ .value = -1, .len = val });
             continue;
         }
         const half = try std.math.divExact(i64, @intCast(i), 2);
-        for (0..val) |_| {
-            try blocks.append(half);
-        }
+        try blocks.append(Block{ .value = half, .len = val });
     }
 
-    var regionval: i64 = -1;
-    var len: usize = 0;
     for (blocks.items, 0..) |_, ri| {
-        const i = blocks.items.len - 1 - ri;
+        const i: usize = blocks.items.len - ri - 1;
         const val = blocks.items[i];
-        if (val == regionval) {
-            len += 1;
+        if (val.value == -1) {
             continue;
         }
 
-        if (regionval != -1) {
-            if (determine_first_large_enough_empty_region(blocks.items[0 .. i + 1], len)) |region| {
-                @memset(region, regionval);
-                @memset(blocks.items[i + 1 .. i + 1 + len], -1);
-            }
+        if (determine_first_empty(blocks.items[0..i], val.len)) |first| {
+            try insert(&blocks, i, first);
         }
-
-        len = 1;
-        regionval = val;
     }
 
+    var index: usize = 0;
     var result: u64 = 0;
-    for (blocks.items, 0..) |block, index| {
-        if (block == -1) {
-            continue;
+    for (blocks.items) |block| {
+        for (0..block.len) |_| {
+            defer index += 1;
+            if (block.value == -1) {
+                std.debug.print(".", .{});
+                continue;
+            }
+            std.debug.print("{d}", .{block.value});
+            const b: usize = @intCast(block.value);
+            result += b * index;
         }
-        const b: usize = @intCast(block);
-        result += b * index;
     }
 
-    std.debug.print("{d}\n", .{result});
+    std.debug.print("\n{d}\n", .{result});
 }
