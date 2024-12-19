@@ -119,16 +119,6 @@ def main():
         f.readline()
         program.extend(map(int, f.readline().split()[-1].split(",")))
 
-    # Program: 2,4,1,1,7,5,1,5,4,2,5,5,0,3,3,0
-
-    # Iteration -10 164278496306046 165523231942078 1244735636032
-
-    # END = 164282120368061
-
-    # print("const", run_program(164278496489149, register_b, register_c, program))
-
-    # start = 164278496306046
-    # end = END
     start = 8**15
     end = 8**16
     for i in range(-1, -16, -1):
