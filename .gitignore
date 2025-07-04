@@ -1,2 +1,7 @@
 # Exclude test data files, which use .in extension.
 *.in
+
+# Scala files
+.bsp
+.metals
+.scala-build
