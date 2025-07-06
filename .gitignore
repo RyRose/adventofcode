@@ -5,3 +5,5 @@
 .bsp
 .metals
 .scala-build
+
+.idea/
