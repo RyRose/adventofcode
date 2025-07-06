@@ -5,6 +5,10 @@ import cats.effect.{IO, IOApp}
 import fs2.io.file.{Files, Path}
 import fs2.Stream
 import cats.effect.ExitCode
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+
+case class NumberLocation(num: Int, row: Int, col: Int, len: Int) {}
 
 object Main03P2 extends IOApp {
 
@@ -24,26 +28,37 @@ object Main03P2 extends IOApp {
   def solution(input: String): Int = {
     val arr = input.split("\n").map(_.split(""))
 
-    def containsSymbol(i: Int, j: Int): Boolean = {
-      if (i < 0 || i >= arr.length || j < 0 || j >= arr(i).length) false
-      else
-        arr(i)(j) match {
-          case "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" |
-              "." =>
-            false
-          case _ => true
-        }
+    var numbers = ArrayBuffer[NumberLocation]()
+    for (case (row, rowI) <- arr.zipWithIndex) {
+      for (it <- integerPattern.findAllMatchIn(row.mkString(""))) {
+        numbers += NumberLocation(
+          num = it.group(0).toInt,
+          row = rowI,
+          col = it.start,
+          len = it.end - it.start
+        )
+      }
     }
 
     var ret = 0
-    for (case (row, rowI) <- arr.zipWithIndex) {
-      for (it <- integerPattern.findAllMatchIn(row.mkString(""))) {
-        val valid = (it.start until it.end).exists(j =>
-          val i = rowI
-          (locations).exists((di, dj) => containsSymbol(i + di, j + dj))
-        )
-        if (valid) {
-          ret += it.group(0).toInt
+    for (case (row, i) <- arr.zipWithIndex) {
+      for (case (col, j) <- row.zipWithIndex) {
+        if (col == "*") {
+          val filtered = numbers.filter(loc => {
+            locations.exists { case (x, y) =>
+              if (
+                loc.row != (i + x) || (j + y) < loc.col || (j + y) >= (loc.col + loc.len)
+              ) {
+                false
+              } else {
+                true
+              }
+            }
+          })
+          if (filtered.length == 2) {
+            val (l, r) = (filtered.head, filtered.last)
+            ret += l.num * r.num
+          }
         }
       }
     }
