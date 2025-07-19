@@ -40,29 +40,23 @@ object Main03P2 extends IOApp {
       }
     }
 
-    var ret = 0
-    for (case (row, i) <- arr.zipWithIndex) {
-      for (case (col, j) <- row.zipWithIndex) {
-        if (col == "*") {
-          val filtered = numbers.filter(loc => {
-            locations.exists { case (x, y) =>
-              if (
-                loc.row != (i + x) || (j + y) < loc.col || (j + y) >= (loc.col + loc.len)
-              ) {
-                false
-              } else {
-                true
-              }
-            }
-          })
-          if (filtered.length == 2) {
-            val (l, r) = (filtered.head, filtered.last)
-            ret += l.num * r.num
-          }
+    val ret = for {
+      (row, i) <- arr.zipWithIndex
+      (col, j) <- row.zipWithIndex if col == "*"
+    } yield {
+      val filtered = numbers.filter(loc => {
+        locations.exists { case (x, y) =>
+          !(loc.row != (i + x) || (j + y) < loc.col || (j + y) >= (loc.col + loc.len))
         }
+      })
+      if (filtered.length == 2) {
+        val (l, r) = (filtered.head, filtered.last)
+        l.num * r.num
+      } else {
+        0
       }
     }
-    ret
+    ret.sum
   }
 
   def run(args: List[String]): IO[ExitCode] = {
