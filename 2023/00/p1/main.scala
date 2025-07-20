@@ -3,10 +3,10 @@
 
 package y2023.d00.p1
 
-import cats.effect.{IO, IOApp}
+import cats.effect.{ExitCode, IO, IOApp}
+import cats.implicits._
 import fs2.io.file.{Files, Path}
 import fs2.Stream
-import cats.effect.ExitCode
 
 object Main extends IOApp {
 
