@@ -3,81 +3,95 @@
 
 package y2023.d05.p2
 
-import cats.effect.{IO, IOApp}
+import cats.effect.{IO, IOApp, ExitCode}
 import fs2.io.file.{Files, Path}
-import fs2.Stream
-import cats.effect.ExitCode
-import java.util.Arrays
 
 case class Range(source: Long, destination: Long, length: Long) {
-  def offset: Long = destination - source
-  def contains(value: Long): Boolean =
-    source <= value && value <= (source + length)
+  def sourceEnd: Long = source + length
+  def destinationEnd: Long = destination + length
 }
 
-case class ProblemState(seeds: List[Long], maps: List[List[Range]])
+case class ProblemState(seedRanges: List[(Long, Long)], maps: List[List[Range]])
 
-object PS2Faster extends IOApp {
+object PS2Fast extends IOApp {
 
   val intRe = "[0-9]+".r
 
   def parseRaw(contents: String): ProblemState = {
-    val lines = contents.split("\n").toList
-    val seeds = intRe.findAllIn(lines.head).map(_.toLong).toList
-    val ranges = lines.tail.map { line =>
-      intRe.findAllIn(line).map(_.toLong).toList match {
-        case List(destination, source, length) =>
-          Some(Range(source, destination, length))
-        case _ => None
-      }
+    val groups = contents.split("\n\n").toList
+
+    val seedRanges = intRe
+      .findAllIn(groups.head)
+      .map(_.toLong)
+      .toList
+      .grouped(2)
+      .collect { case List(start, len) => (start, len) }
+      .toList
+
+    val maps = groups.tail.map { group =>
+      group.linesIterator
+        .filter(_.exists(_.isDigit)) // skip headers
+        .map(intRe.findAllIn(_).map(_.toLong).toList)
+        .collect { case List(dest, src, len) => Range(src, dest, len) }
+        .toList
     }
-    val maps = ranges.foldLeft(List[List[Range]]()) {
-      case (acc, None) =>
-        if (acc.isEmpty || !acc.last.isEmpty) acc :+ List()
-        else acc
-      case (acc, Some(value)) =>
-        acc.init :+ (acc.last :+ value)
-    }
-    ProblemState(seeds, maps.map(_.sortBy(_.source)))
+
+    ProblemState(seedRanges, maps)
   }
 
-  def solve(state: ProblemState): Iterator[Long] = {
-    println("Seeds: " + state.seeds.mkString(", "))
-    state.seeds
-      .grouped(2)
-      .tapEach(group => println(s"Processing group: $group"))
-      .filter(_.size == 2)
-      .flatMap { case List(a, b) =>
-        (a to (a + b)).map { seed =>
-          // println(s"Processing seed: $seed")
-          state.maps.foldLeft(seed) { (current, ranges) =>
-            // println(s"Current seed: $current, Ranges: ${ranges.mkString(", ")}")
-            Arrays.binarySearch(
-              ranges.toArray,
-              Range(current, 0, 0),
-              (a: Range, b: Range) => {
-                java.lang.Long.compare(a.source, b.source)
-              }
-            ) match {
-              case index if index >= 0 =>
-                // println(s"Found exact match at index: $index")
-                val range = ranges(index)
-                current + range.offset
-              case index if ranges(math.max(0, -index - 2)).contains(current) =>
-                // println(
-                //   s"Found range containing current seed at index: $index"
-                // )
-                val range = ranges(math.max(0, -index - 2))
-                current + range.offset
-              case index =>
-                // println(
-                //   s"No applicable range found for current seed: $current, index: $index"
-                // )
-                current // No applicable range found, return current seed
-            }
+  def mapRanges(
+      inputRanges: List[(Long, Long)],
+      map: List[Range]
+  ): List[(Long, Long)] = {
+    val result = scala.collection.mutable.ListBuffer.empty[(Long, Long)]
+
+    for ((start, length) <- inputRanges) {
+      var pending = List((start, length))
+
+      for (r <- map) {
+        val next = scala.collection.mutable.ListBuffer.empty[(Long, Long)]
+
+        while (pending.nonEmpty) {
+          val (s, l) = pending.head
+          pending = pending.tail
+
+          val e = s + l
+          val rStart = r.source
+          val rEnd = r.source + r.length
+
+          if (e <= rStart || s >= rEnd) {
+            // No overlap
+            next += ((s, l))
+          } else {
+            // Before overlap
+            if (s < rStart)
+              next += ((s, rStart - s))
+
+            // Overlapping region
+            val overlapStart = s.max(rStart)
+            val overlapEnd = e.min(rEnd)
+            val overlapLen = overlapEnd - overlapStart
+            val mappedStart = r.destination + (overlapStart - r.source)
+            result += ((mappedStart, overlapLen))
+
+            // After overlap
+            if (e > rEnd)
+              pending = ((rEnd, e - rEnd)) :: pending
           }
         }
+
+        pending = next.toList
       }
+
+      result ++= pending
+    }
+
+    result.toList
+  }
+
+  def solve(state: ProblemState): Long = {
+    val finalRanges = state.maps.foldLeft(state.seedRanges)(mapRanges)
+    finalRanges.map(_._1).min
   }
 
   def run(args: List[String]): IO[ExitCode] = {
@@ -85,7 +99,6 @@ object PS2Faster extends IOApp {
       .readUtf8(Path(args.head))
       .map(parseRaw)
       .map(solve)
-      .map(_.min)
       .evalMap(IO.println)
       .compile
       .drain
