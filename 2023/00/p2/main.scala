@@ -12,8 +12,7 @@ object Main extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = {
     Files[IO]
-      .readUtf8Lines(Path(args.head))
-      .filter(line => line.nonEmpty)
+      .readUtf8(Path(args.head))
       .evalMap(IO.println)
       .compile
       .drain
