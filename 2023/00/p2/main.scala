@@ -1,4 +1,4 @@
-//> using dep "org.typelevel::cats-effect:3.6.2"
+//> using dep "org.typelevel::cats-effect:3.6.3"
 //> using dep "co.fs2::fs2-io:3.12.0"
 
 package y2023.d00.p2

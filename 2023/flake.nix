@@ -27,10 +27,6 @@
             pkgs.metals # Optional: Scala LSP for IDEs
             pkgs.sbt # Optional: for legacy builds
           ];
-
-          shellHook = ''
-            echo "Welcome to your Scala dev shell"
-          '';
         };
       }
     );

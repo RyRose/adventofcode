@@ -7,3 +7,5 @@
 .scala-build
 
 .idea/
+
+.direnv/
