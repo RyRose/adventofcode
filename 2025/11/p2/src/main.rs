@@ -1,8 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
+use std::collections::{HashMap, HashSet};
 
 type Device = String;
 
@@ -28,10 +24,9 @@ impl Mapping {
 
 #[derive(Debug)]
 struct State {
-    // TODO: Think about how to avoid Rc. The set of mappings is static such that we should be able
-    // to guarantee references held in hashmap are valid if they are values in mappings.
-    mappings: Vec<Rc<Mapping>>,
-    graph: HashMap<Device, Rc<Mapping>>,
+    mappings: Vec<Mapping>,
+    graph: HashMap<Device, Mapping>,
+    rgraph: HashMap<Device, Vec<Device>>,
 }
 
 impl State {
@@ -40,15 +35,66 @@ impl State {
             .map_err(|e| format!("Failed to read file ({}): {}", path, e))?;
         let mut mappings = Vec::new();
         let mut graph = HashMap::new();
+        let mut rgraph = HashMap::new();
         for line in content.lines() {
-            let mapping = Rc::new(Mapping::parse(line)?);
+            let mapping = Mapping::parse(line)?;
             graph.insert(mapping.input.clone(), mapping.clone());
+            for output in &mapping.output {
+                rgraph
+                    .entry(output.clone())
+                    .or_insert_with(Vec::new)
+                    .push(mapping.input.clone());
+            }
             mappings.push(mapping);
         }
-        Ok(Self { mappings, graph })
+        Ok(Self {
+            mappings,
+            graph,
+            rgraph,
+        })
     }
 
-    fn dfs<'a>(&'a self, cur: &'a str, seen: &mut HashSet<&'a str>) -> i32 {
+    fn solve(&self) -> i64 {
+        let first = [
+            self.dfs("svr", "fft"),
+            self.dfs("fft", "dac"),
+            self.dfs("dac", "out"),
+        ];
+        println!("First path counts: {:?}", first);
+        let second = [
+            self.dfs("svr", "dac"),
+            self.dfs("dac", "fft"), // NOTE: this is zero in the main dataset.
+            self.dfs("fft", "out"),
+        ];
+        println!("Second path counts: {:?}", second);
+        let products = [first, second].map(|arr| arr.iter().product::<i64>());
+        println!("Products: {:?}", products);
+        products.iter().sum::<i64>()
+    }
+
+    fn dfs(&self, start: &str, target: &str) -> i64 {
+        self._dfs(start, target, &mut HashMap::new())
+    }
+
+    fn _dfs<'a>(&'a self, cur: &'a str, target: &'a str, seen: &mut HashMap<&'a str, i64>) -> i64 {
+        if cur == target {
+            return 1;
+        }
+        if let Some(v) = seen.get(cur) {
+            return *v;
+        }
+        let mut ret = 0;
+        if let Some(mapping) = self.graph.get(cur) {
+            for next in mapping.output.iter() {
+                ret += self._dfs(next, target, seen);
+            }
+        }
+        seen.insert(cur, ret);
+        ret
+    }
+
+    // TOO SLOW!!
+    fn _dfs_slow<'a>(&'a self, cur: &'a str, seen: &mut HashSet<&'a str>) -> i32 {
         if cur == "out" {
             if seen.contains("dac") && seen.contains("fft") {
                 println!("Seen path to out: {:?}", seen);
@@ -62,7 +108,7 @@ impl State {
         let mut ret = 0;
         if let Some(mapping) = self.graph.get(cur) {
             for next in mapping.output.iter() {
-                ret += self.dfs(next, seen);
+                ret += self.dfs_slow(next, seen);
             }
         }
         seen.remove(cur);
@@ -73,6 +119,5 @@ impl State {
 fn main() {
     let filepath = std::env::args().nth(1).unwrap();
     let state = State::read(&filepath).unwrap();
-    println!("State: {:?}", state);
-    println!("DFS count: {}", state.dfs("svr", &mut HashSet::new()));
+    println!("DFS count: {}", state.solve());
 }
