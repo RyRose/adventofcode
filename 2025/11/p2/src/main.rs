@@ -24,9 +24,7 @@ impl Mapping {
 
 #[derive(Debug)]
 struct State {
-    mappings: Vec<Mapping>,
     graph: HashMap<Device, Mapping>,
-    rgraph: HashMap<Device, Vec<Device>>,
 }
 
 impl State {
@@ -35,23 +33,12 @@ impl State {
             .map_err(|e| format!("Failed to read file ({}): {}", path, e))?;
         let mut mappings = Vec::new();
         let mut graph = HashMap::new();
-        let mut rgraph = HashMap::new();
         for line in content.lines() {
             let mapping = Mapping::parse(line)?;
             graph.insert(mapping.input.clone(), mapping.clone());
-            for output in &mapping.output {
-                rgraph
-                    .entry(output.clone())
-                    .or_insert_with(Vec::new)
-                    .push(mapping.input.clone());
-            }
             mappings.push(mapping);
         }
-        Ok(Self {
-            mappings,
-            graph,
-            rgraph,
-        })
+        Ok(Self { graph })
     }
 
     fn solve(&self) -> i64 {
@@ -63,7 +50,9 @@ impl State {
         println!("First path counts: {:?}", first);
         let second = [
             self.dfs("svr", "dac"),
-            self.dfs("dac", "fft"), // NOTE: this is zero in the main dataset.
+            // NOTE: this is zero in the main dataset. So, second is always
+            // zero but we keep it to allow other data sets.
+            self.dfs("dac", "fft"),
             self.dfs("fft", "out"),
         ];
         println!("Second path counts: {:?}", second);
@@ -76,20 +65,21 @@ impl State {
         self._dfs(start, target, &mut HashMap::new())
     }
 
-    fn _dfs<'a>(&'a self, cur: &'a str, target: &'a str, seen: &mut HashMap<&'a str, i64>) -> i64 {
+    // Memoized DFS - graph is a DAG so no cycles to worry about
+    fn _dfs<'a>(&'a self, cur: &'a str, target: &'a str, memo: &mut HashMap<&'a str, i64>) -> i64 {
         if cur == target {
             return 1;
         }
-        if let Some(v) = seen.get(cur) {
+        if let Some(v) = memo.get(cur) {
             return *v;
         }
         let mut ret = 0;
         if let Some(mapping) = self.graph.get(cur) {
             for next in mapping.output.iter() {
-                ret += self._dfs(next, target, seen);
+                ret += self._dfs(next, target, memo);
             }
         }
-        seen.insert(cur, ret);
+        memo.insert(cur, ret);
         ret
     }
 
@@ -108,7 +98,7 @@ impl State {
         let mut ret = 0;
         if let Some(mapping) = self.graph.get(cur) {
             for next in mapping.output.iter() {
-                ret += self.dfs_slow(next, seen);
+                ret += self._dfs_slow(next, seen);
             }
         }
         seen.remove(cur);
